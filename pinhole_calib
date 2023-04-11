@@ -1,0 +1,255 @@
+
+  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+ 11
+ 12
+ 13
+ 14
+ 15
+ 16
+ 17
+ 18
+ 19
+ 20
+ 21
+ 22
+ 23
+ 24
+ 25
+ 26
+ 27
+ 28
+ 29
+ 30
+ 31
+ 32
+ 33
+ 34
+ 35
+ 36
+ 37
+ 38
+ 39
+ 40
+ 41
+ 42
+ 43
+ 44
+ 45
+ 46
+ 47
+ 48
+ 49
+ 50
+ 51
+ 52
+ 53
+ 54
+ 55
+ 56
+ 57
+ 58
+ 59
+ 60
+ 61
+ 62
+ 63
+ 64
+ 65
+ 66
+ 67
+ 68
+ 69
+ 70
+ 71
+ 72
+ 73
+ 74
+ 75
+ 76
+ 77
+ 78
+ 79
+ 80
+ 81
+ 82
+ 83
+ 84
+ 85
+ 86
+ 87
+ 88
+ 89
+ 90
+ 91
+ 92
+ 93
+ 94
+ 95
+ 96
+ 97
+ 98
+ 99
+100
+101
+102
+103
+104
+105
+106
+107
+108
+109
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+120
+121
+122
+123
+124
+125
+126
+127
+import cv2
+import numpy as np
+import glob
+
+# checker board size
+rows = 8
+cols = 6
+
+criteria = (cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS, 30, 0.001)
+
+objectPoints = np.zeros((rows * cols, 3), np.float32)
+
+objectPoints[:, :2] = np.mgrid[0:rows, 0:cols].T.reshape(-1, 2)
+
+objectPointsArray = []
+
+imgPointsArray = []
+
+# images = glob.glob('image/*.jpg')
+images = glob.glob('image/left*.png')
+
+img_used_num = 0 
+img_count = 0;
+
+image_shape = (0,0)
+
+for fname in images:
+  
+    img = cv2.imread(fname)
+    if image_shape == (0,0): image_shape = img.shape[:2]
+    else: assert image_shape == img.shape[:2], "All images must share the same size."
+    
+    grayImg = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    ret, corners = cv2.findChessboardCorners(grayImg, (rows, cols), None)
+    
+    img_count += 1
+    
+    if ret == True:
+        corners = cv2.cornerSubPix(grayImg, corners, (11, 11), (-1, -1), criteria)
+        objectPointsArray.append(objectPoints)
+        imgPointsArray.append(corners)
+
+        cv2.drawChessboardCorners(img, (rows, cols), corners, ret)
+        img_used_num += 1
+        
+        cv2.imwrite('result/corners'+str(img_count)+'.jpg', img)
+    
+        
+    cv2.imshow('img with corners', img)
+    
+    cv2.waitKey(200)
+    
+cv2.destroyAllWindows()
+
+print("img used : ", img_used_num)
+
+
+ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objectPointsArray, imgPointsArray, image_shape[::-1], None, None)
+
+
+count = 0
+for fname in images:
+    img = cv2.imread(fname)
+    h, w = img.shape[:2]
+	
+    newCameraMtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), 1, (w, h))
+    
+    undistortedImg = cv2.undistort(img, mtx, dist, None, newCameraMtx)
+	
+    cv2.imshow('UNDISTORTED NAIVE', undistortedImg)
+    
+    x, y, w, h = roi
+    undistortedImgCrop = undistortedImg[y:y+h, x:x+w]
+    
+    cv2.imshow('undistored croped', undistortedImgCrop)
+    count+=1
+    cv2.imwrite('result/und_'+ str(count)+'.jpg', undistortedImg)
+    cv2.imwrite('result/und_croped_'+ str(count)+'.jpg', undistortedImgCrop)
+    
+    cv2.waitKey(200)
+    
+cv2.destroyAllWindows()
+
+for i in range(len(images)):
+  img = cv2.imread(images[i])
+  h, w = img.shape[:2]
+  
+  grayImg = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+  ret, corners = cv2.findChessboardCorners(grayImg, (rows, cols), None)
+  
+  img_c = img.copy()
+  
+  points1 = []
+  for p in corners:
+    points1.append( (int(p[0][0]),int(p[0][1])) )
+  for p in points1:
+    cv2.circle(img_c,p,2,(0,0,255),2)
+  cv2.imshow('orig image corner',  img_c)
+  cv2.imshow('orig image ',  img)
+
+  
+  undistortedImg = cv2.undistort(img, mtx, dist, None, newCameraMtx)
+  # cv2.imshow('UNDISTORTED NAIVE', undistortedImg)
+  
+  newCameraMtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), 1, (w, h))
+  
+  ud_points = cv2.undistortPoints(corners, mtx, dist, R=None, P=newCameraMtx)
+  points2 = []
+  for p in ud_points:
+    points2.append( (int(p[0][0]),int(p[0][1])) )
+  img2 = undistortedImg.copy()
+  for p in points2:
+    cv2.circle(img2,p,2,(0,0,255),2)
+  cv2.imshow('undistorted image corner',  img2)
+  cv2.imshow('undistorted image',  undistortedImg)
+  
+  print("points1")
+  print(points1)
+  print("points2")
+  print(points2)
+  
+  cv2.waitKey()
+  
+  
+  
+  
